@@ -6,6 +6,7 @@ import { Construct } from 'constructs';
 import type { Stage } from '../lib/types';
 
 import * as cdk from 'aws-cdk-lib';
+import * as acm from 'aws-cdk-lib/aws-certificatemanager';
 import * as ecr from 'aws-cdk-lib/aws-ecr';
 import * as pipes from 'aws-cdk-lib/pipelines';
 import * as route53 from 'aws-cdk-lib/aws-route53';
@@ -30,6 +31,7 @@ interface DnsStageProps extends cdk.StageProps {
 }
 
 class DnsStage extends cdk.Stage {
+  public readonly cert: acm.Certificate;
   public readonly domain: string;
   public readonly zone: route53.PublicHostedZone;
 
@@ -40,6 +42,7 @@ class DnsStage extends cdk.Stage {
       domain: '', //TBD
     });
 
+    this.cert = zoneStack.cert;
     this.domain = zoneStack.domain;
     this.zone = zoneStack.zone;
   }
@@ -85,6 +88,7 @@ class App extends cdk.Stage {
     super(scope, id, props);
 
     new BackendStack(this, 'BackendStack', {
+      cert: dnsStage.cert,
       domain: props.domain,
       ecr: props.apiEcr,
       stage: props.stage,

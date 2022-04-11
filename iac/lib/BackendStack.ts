@@ -2,14 +2,17 @@ import { Construct } from 'constructs';
 import { Stage } from './types';
 
 import * as cdk from 'aws-cdk-lib';
+import * as acm from 'aws-cdk-lib/aws-certificatemanager';
 import * as api from 'aws-cdk-lib/aws-apigateway';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import * as ecr from 'aws-cdk-lib/aws-ecr';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as route53 from 'aws-cdk-lib/aws-route53';
 import * as ssm from 'aws-cdk-lib/aws-ssm';
+import * as targets from 'aws-cdk-lib/aws-route53-targets';
 
 export interface BackendStackProps extends cdk.StackProps {
+  cert: acm.ICertificate,
   domain: string;
   ecr: ecr.IRepository;
   stage: Stage;
@@ -52,26 +55,19 @@ export default class BackendStack extends cdk.Stack {
     /////////////////
 
     const gateway = new api.LambdaRestApi(this, 'ApiGateway', {
+      domainName: {
+        certificate: props.cert,
+        domainName: props.domain,
+      },
       handler: apiHandler,
       proxy: false,
     });
     this.url = gateway.url;
 
-    const match = gateway.root.addResource('match');
-
-    // /match/new
-    const newMatch = match.addResource('new');
-    newMatch.addMethod('POST');
-
-    // /match/{id}
-    const byId = match.addResource('{id}');
-    byId.addMethod('GET');
-    byId.addMethod('POST');
-
-    new route53.CnameRecord(this, 'APICnameRecord', {
+    new route53.ARecord(this, 'ApiARecord', {
       recordName: props.stage === 'prod' ? 'api' : `${props.stage}.api`,
       zone: props.zone,
-      domainName: gateway.url,
+      target: route53.RecordTarget.fromAlias(new targets.ApiGateway(gateway)),
     });
   }
 }
