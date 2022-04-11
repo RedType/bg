@@ -17,11 +17,6 @@ import FrontendStack from '../lib/FrontendStack';
 import EcrPipeline from '../lib/util/EcrPipeline';
 import PollParameterStep from '../lib/util/PollParameterStep';
 
-const env = {
-  account: process.env.CDK_DEPLOY_ACCOUNT || process.env.CDK_DEFAULT_ACCOUNT,
-  region: process.env.CDK_DEPLOY_REGION || process.env.CDK_DEFAULT_REGION,
-};
-
 const app = new cdk.App();
 
 /////////////////////////////////////////////////////////////////////
@@ -109,7 +104,6 @@ class App extends cdk.Stage {
 ///////////////////////////////////////////////////////////////
 
 const cdkPipes = new CdkPipelineStack(app, 'CdkPipeline', {
-  env,
   repository: {
     name: 'RedType/bg',
     branch: 'deploy/cdk',
@@ -123,7 +117,6 @@ cdkPipes.pipes.addStage(dnsStage);
 
 for (const stage of ['dev', 'prod'] as Stage[]) {
   const subPipes = new SubPipes(cdkPipes, `${stage}/SubPipes`, {
-    env,
     stage,
     cdkPipeline: cdkPipes.name,
   });
@@ -142,11 +135,13 @@ for (const stage of ['dev', 'prod'] as Stage[]) {
   });
 
   cdkPipes.pipes.addStage(new App(cdkPipes, `${stage}/App`, {
-    env, stage,
+    stage,
     apiEcr: subPipes.apiEcr,
     apiTag: subPipes.apiTag,
     domain: dnsStage.domain,
     zone: dnsStage.zone,
   }));
 }
+
+app.synth();
 
