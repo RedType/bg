@@ -8,6 +8,7 @@ import type { Stage } from '../lib/types';
 import * as cdk from 'aws-cdk-lib';
 import * as ecr from 'aws-cdk-lib/aws-ecr';
 import * as pipes from 'aws-cdk-lib/pipelines';
+import * as route53 from 'aws-cdk-lib/aws-route53';
 
 import BackendStack from '../lib/BackendStack';
 import CdkPipelineStack from '../lib/CdkPipelineStack';
@@ -29,6 +30,25 @@ const app = new cdk.App();
 /////////////////////////////////////////////////////////////////////
 
 const githubSecret = cdk.SecretValue.secretsManager('github-token');
+
+interface DnsStageProps extends cdk.StageProps {
+}
+
+class DnsStage extends cdk.Stage {
+  public readonly domain: string;
+  public readonly zone: route53.PublicHostedZone;
+
+  constructor(scope: Construct, id: string, props: DnsStageProps) {
+    super(scope, id, props);
+
+    const zoneStack = new DnsStack(this, 'DnsStack', {
+      domain: '', //TBD
+    });
+
+    this.domain = zoneStack.domain;
+    this.zone = zoneStack.zone;
+  }
+}
 
 interface SubPipesProps extends cdk.StageProps {
   cdkPipeline: string;
@@ -60,24 +80,21 @@ class SubPipes extends cdk.Stage {
 interface AppProps extends cdk.StageProps {
   apiEcr: ecr.IRepository;
   apiTag: string;
+  domain: string;
   stage: Stage;
+  zone: route53.IHostedZone;
 }
 
 class App extends cdk.Stage {
   constructor(scope: Construct, id: string, props: AppProps) {
     super(scope, id, props);
 
-    const zoneStack = new DnsStack(this, 'DnsStack', {
-      domain: '', //TBD
-      stage: props.stage,
-    });
-
     new BackendStack(this, 'BackendStack', {
-      domain: zoneStack.domain,
+      domain: props.domain,
       ecr: props.apiEcr,
       stage: props.stage,
       tagParameter: props.apiTag,
-      zone: zoneStack.zone,
+      zone: props.zone,
     });
 
     new FrontendStack(this, 'FrontendStack', {
@@ -100,6 +117,9 @@ const cdkPipes = new CdkPipelineStack(app, 'CdkPipeline', {
     secret: githubSecret,
   },
 });
+
+const dnsStage = new DnsStage(cdkPipes, 'DnsStage', {});
+cdkPipes.pipes.addStage(dnsStage);
 
 for (const stage of ['dev', 'prod'] as Stage[]) {
   const subPipes = new SubPipes(cdkPipes, `${stage}/SubPipes`, {
@@ -125,6 +145,8 @@ for (const stage of ['dev', 'prod'] as Stage[]) {
     env, stage,
     apiEcr: subPipes.apiEcr,
     apiTag: subPipes.apiTag,
+    domain: dnsStage.domain,
+    zone: dnsStage.zone,
   }));
 }
 

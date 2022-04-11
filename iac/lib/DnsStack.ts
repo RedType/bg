@@ -7,7 +7,6 @@ import * as route53 from 'aws-cdk-lib/aws-route53';
 
 export interface DnsStackProps extends cdk.StackProps {
   domain: string;
-  stage: Stage;
 }
 
 export default class DnsStack extends cdk.Stack {
