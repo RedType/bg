@@ -13,7 +13,7 @@
 
   outputs = { self, nixpkgs, utils, rust-overlay, flake-compat }:
     let
-      name = "tagbot";
+      name = "bg";
       NYI = builtins.throw "This feature is NYI";
     in utils.lib.eachDefaultSystem (system:
       let
@@ -40,6 +40,7 @@
           nixpkgs-fmt
           pkgconfig
           rustc
+          rustup
         ];
 
         buildEnvVars = {
